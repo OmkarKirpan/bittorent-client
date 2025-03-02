@@ -49,6 +49,41 @@ func TestDecode(t *testing.T) {
 			bytes:    0,
 			err:      errors.New("string data too short"),
 		},
+		{
+			name:     "Valid bencoded integer",
+			input:    []byte("i42e"),
+			expected: int64(42),
+			bytes:    4,
+			err:      nil,
+		},
+		{
+			name:     "Invalid bencoded integer (no end marker)",
+			input:    []byte("i42"),
+			expected: int64(0),
+			bytes:    0,
+			err:      errors.New("invalid integer format: no end marker"),
+		},
+		{
+			name:     "Invalid bencoded integer (leading zeros)",
+			input:    []byte("i042e"),
+			expected: int64(0),
+			bytes:    0,
+			err:      errors.New("invalid integer format: leading zeros"),
+		},
+		{
+			name:     "Invalid bencoded integer (negative zero)",
+			input:    []byte("i-0e"),
+			expected: int64(0),
+			bytes:    0,
+			err:      errors.New("invalid integer format: negative zero"),
+		},
+		{
+			name:     "Invalid bencoded integer (non-numeric)",
+			input:    []byte("i4a2e"),
+			expected: int64(0),
+			bytes:    0,
+			err:      fmt.Errorf("invalid integer: strconv.ParseInt: parsing \"4a2\": invalid syntax"),
+		},
 	}
 
 	for _, tt := range tests {

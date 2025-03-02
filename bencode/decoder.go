@@ -15,6 +15,8 @@ func Decode(data []byte) (interface{}, int, error) {
 	switch data[0] {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return decodeString(data)
+	case 'i':
+		return decodeInteger(data)
 	default:
 		return nil, 0, fmt.Errorf("unkown type: %c", data[0])
 	}
@@ -51,4 +53,44 @@ func decodeString(data []byte) (string, int, error) {
 
 	// Return string, total bytes consumed, nil error
 	return result, i + 1 + length, nil
+}
+
+// decodeInteger parses a bencoded integer
+// Format: i<number>e
+// Example: i42e -> 42
+func decodeInteger(data []byte) (int64, int, error) {
+	if len(data) < 2 || data[0] != 'i' {
+		return 0, 0, errors.New("invalid integer format")
+	}
+
+	// Find the end marker 'e'
+	endIndex := 1
+	for endIndex < len(data) && data[endIndex] != 'e' {
+		endIndex++
+	}
+
+	if endIndex >= len(data) {
+		return 0, 0, errors.New("invalid integer format: no end marker")
+	}
+
+	// Parse the integer
+	numStr := string(data[1:endIndex])
+
+	// Check for leading zeros or empty string
+	if len(numStr) > 1 && numStr[0] == '0' {
+		return 0, 0, errors.New("invalid integer format: leading zeros")
+	}
+
+	// Check for negative zero
+	if len(numStr) > 1 && numStr[0] == '-' && numStr[1] == '0' {
+		return 0, 0, errors.New("invalid integer format: negative zero")
+	}
+
+	num, err := strconv.ParseInt(numStr, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid integer: %v", err)
+	}
+
+	// Return value, total bytes consumed, nil error
+	return num, endIndex + 1, nil
 }

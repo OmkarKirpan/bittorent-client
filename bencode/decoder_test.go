@@ -101,6 +101,87 @@ func TestDecode(t *testing.T) {
 		})
 	})
 
+	t.Run("Dictionary tests", func(t *testing.T) {
+		runTests(t, []testCase{
+			{
+				name:     "Valid simple dictionary",
+				input:    []byte("d3:foo3:bare"),
+				expected: map[string]interface{}{"foo": "bar"},
+				bytes:    12,
+				err:      nil,
+			},
+			{
+				name:     "Valid complex dictionary",
+				input:    []byte("d3:foo3:bar5:helloi52e4:listli1ei2ei3eee"),
+				expected: map[string]interface{}{
+					"foo":   "bar",
+					"hello": int64(52),
+					"list":  []interface{}{int64(1), int64(2), int64(3)},
+				},
+				bytes:    40,
+				err:      nil,
+			},
+			{
+				name:     "Valid nested dictionary",
+				input:    []byte("d3:food3:baz3:quxee"),
+				expected: map[string]interface{}{
+					"foo": map[string]interface{}{"baz": "qux"},
+				},
+				bytes:    19,
+				err:      nil,
+			},
+			{
+				name:     "Empty dictionary",
+				input:    []byte("de"),
+				expected: map[string]interface{}{},
+				bytes:    2,
+				err:      nil,
+			},
+			{
+				name:     "Invalid dictionary format",
+				input:    []byte("dxyz"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("error decoding dictionary key: unkown type: x"),
+			},
+			{
+				name:     "Invalid dictionary (no end marker)",
+				input:    []byte("d3:foo3:bar"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("invalid dictionary format: no end marker"),
+			},
+			{
+				name:     "Invalid dictionary (non-string key)",
+				input:    []byte("di123e3:bare"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("dictionary key must be a string"),
+			},
+			{
+				name:     "Invalid dictionary (missing value)",
+				input:    []byte("d3:fooe"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("error decoding dictionary value: unkown type: e"),
+			},
+			{
+				name:     "Invalid dictionary (invalid value)",
+				input:    []byte("d3:fooi42e"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("invalid dictionary format: no end marker"),
+			},
+			{
+				name:     "Invalid dictionary (error in value)",
+				input:    []byte("d3:fooi42"),
+				expected: map[string]interface{}{},
+				bytes:    0,
+				err:      errors.New("error decoding dictionary value: invalid integer format: no end marker"),
+			},
+		})
+	})
+
 	t.Run("Edge cases", func(t *testing.T) {
 		runTests(t, []testCase{
 			{
@@ -135,7 +216,7 @@ func runTests(t *testing.T, tests []testCase) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, n, err := Decode(tt.input)
-
+			
 			// Check error correctness
 			if err != nil && tt.err != nil {
 				if err.Error() != tt.err.Error() {
@@ -144,18 +225,28 @@ func runTests(t *testing.T, tests []testCase) {
 			} else if (err == nil) != (tt.err == nil) {
 				t.Errorf("Decode(%q) error = %v, want error = %v", tt.input, err, tt.err)
 			}
-
+			
 			// Check bytes read
 			if n != tt.bytes {
 				t.Errorf("Decode(%q) bytes = %d, want %d", tt.input, n, tt.bytes)
 			}
-
-			// Check result, with special handling for empty lists
+			
+			// Check result, with special handling for empty lists and dictionaries
 			if listResult, ok := result.([]interface{}); ok {
 				if expectedList, ok2 := tt.expected.([]interface{}); ok2 {
 					if len(expectedList) == 0 && len(listResult) == 0 {
 						// Both are empty lists, this is fine
 					} else if !reflect.DeepEqual(listResult, expectedList) {
+						t.Errorf("Decode(%q) result = %v, want %v", tt.input, result, tt.expected)
+					}
+				} else if !reflect.DeepEqual(result, tt.expected) {
+					t.Errorf("Decode(%q) result = %v, want %v", tt.input, result, tt.expected)
+				}
+			} else if dictResult, ok := result.(map[string]interface{}); ok {
+				if expectedDict, ok2 := tt.expected.(map[string]interface{}); ok2 {
+					if len(expectedDict) == 0 && len(dictResult) == 0 {
+						// Both are empty dictionaries, this is fine
+					} else if !reflect.DeepEqual(dictResult, expectedDict) {
 						t.Errorf("Decode(%q) result = %v, want %v", tt.input, result, tt.expected)
 					}
 				} else if !reflect.DeepEqual(result, tt.expected) {

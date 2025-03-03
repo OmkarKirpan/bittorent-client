@@ -19,6 +19,8 @@ func Decode(data []byte) (interface{}, int, error) {
 		return decodeInteger(data)
 	case 'l':
 		return decodeList(data)
+	case 'd':
+		return decodeDictionary(data)
 	default:
 		return nil, 0, fmt.Errorf("unkown type: %c", data[0])
 	}
@@ -128,5 +130,58 @@ func decodeList(data []byte) ([]interface{}, int, error) {
 	pos++
 
 	// Return list, total bytes consumed, nil error
+	return result, pos, nil
+}
+
+// decodeDictionary parses a bencoded dictionary
+// Format: d<key><value>...e
+// Example: d3:foo3:bar5:helloi52ee -> {"foo": "bar", "hello": 52}
+func decodeDictionary(data []byte) (map[string]interface{}, int, error) {
+	if len(data) < 2 || data[0] != 'd' {
+		return nil, 0, errors.New("invalid dictionary format")
+	}
+
+	result := make(map[string]interface{})
+	pos := 1 // Skip the 'd' marker
+
+	// Dictionary format is a series of key-value pairs
+	for pos < len(data) && data[pos] != 'e' {
+		// Keys must be strings in bencode
+		keyInterface, bytesRead, err := Decode(data[pos:])
+		if err != nil {
+			return nil, 0, fmt.Errorf("error decoding dictionary key: %v", err)
+		}
+
+		// Ensure the key is a string
+		key, ok := keyInterface.(string)
+		if !ok {
+			return nil, 0, errors.New("dictionary key must be a string")
+		}
+
+		pos += bytesRead
+
+		// Now decode the value
+		if pos >= len(data) {
+			return nil, 0, errors.New("unexpected end of data: missing value")
+		}
+
+		value, bytesRead, err := Decode(data[pos:])
+		if err != nil {
+			return nil, 0, fmt.Errorf("error decoding dictionary value: %v", err)
+		}
+
+		// Add key-value pair to result
+		result[key] = value
+		pos += bytesRead
+	}
+
+	if pos >= len(data) {
+		return nil, 0, errors.New("invalid dictionary format: no end marker")
+	}
+
+	// Skip the 'e' marker
+	pos++
+
+	// Return dictionary, total bytes consumed, nil error
 	return result, pos, nil
 }

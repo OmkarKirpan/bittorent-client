@@ -17,6 +17,8 @@ func Decode(data []byte) (interface{}, int, error) {
 		return decodeString(data)
 	case 'i':
 		return decodeInteger(data)
+	case 'l':
+		return decodeList(data)
 	default:
 		return nil, 0, fmt.Errorf("unkown type: %c", data[0])
 	}
@@ -93,4 +95,38 @@ func decodeInteger(data []byte) (int64, int, error) {
 
 	// Return value, total bytes consumed, nil error
 	return num, endIndex + 1, nil
+}
+
+// decodeList parses a bencoded list
+// Format: l<contents>e
+// Example: li1ei2ei3ee -> [1, 2, 3]
+func decodeList(data []byte) ([]interface{}, int, error) {
+	if len(data) < 2 || data[0] != 'l' {
+		return nil, 0, errors.New("invalid list format")
+	}
+
+	result := []interface{}{}
+	pos := 1 // Skip the 'l' marker
+
+	for pos < len(data) && data[pos] != 'e' {
+		// Decode the next item in the list
+		item, bytesRead, err := Decode(data[pos:])
+		if err != nil {
+			return nil, 0, fmt.Errorf("error decoding list item: %v", err)
+		}
+
+		// Add item to result and move position forward
+		result = append(result, item)
+		pos += bytesRead
+	}
+
+	if pos >= len(data) {
+		return nil, 0, errors.New("invalid list format: no end marker")
+	}
+
+	// Skip the 'e' marker
+	pos++
+
+	// Return list, total bytes consumed, nil error
+	return result, pos, nil
 }

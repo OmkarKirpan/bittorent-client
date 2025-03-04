@@ -22,7 +22,7 @@ func Decode(data []byte) (interface{}, int, error) {
 	case 'd':
 		return decodeDictionary(data)
 	default:
-		return nil, 0, fmt.Errorf("unkown type: %c", data[0])
+		return nil, 0, fmt.Errorf("unknown type: %c", data[0])
 	}
 }
 

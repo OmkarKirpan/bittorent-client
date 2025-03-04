@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/omkarkirpan/bittorrent-client/torrent"
+	"github.com/omkarkirpan/bittorrent-client/tracker"
 )
 
 // humanReadableSize converts bytes to a human-readable format.
@@ -85,5 +86,21 @@ func main() {
 		}
 		fmt.Printf("Last Piece (%d) Hash: %x (Length: %s bytes)\n",
 			numPieces-1, hash, humanReadableSize(torrentFile.PieceLength(numPieces-1)))
+	}
+
+	// Discover peers
+	fmt.Println("\nDiscovering peers...")
+	peers, err := tracker.RequestPeers(torrentFile, 6881) // 6881 is a common BitTorrent port
+	if err != nil {
+		log.Fatalf("Error discovering peers: %v", err)
+	}
+
+	fmt.Printf("Found %d peers:\n", len(peers))
+	for i, peer := range peers {
+		if i >= 5 {
+			fmt.Printf("... and %d more\n", len(peers)-5)
+			break
+		}
+		fmt.Printf("  %s\n", peer.String())
 	}
 }

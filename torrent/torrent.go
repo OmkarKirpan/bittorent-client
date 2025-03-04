@@ -1,12 +1,18 @@
 package torrent
 
 import (
+	"crypto/sha1"
 	"errors"
 	"io"
 	"os"
 
 	"github.com/omkarkirpan/bittorrent-client/bencode"
 )
+
+// Encoder interface for a future bencode encoder
+type Encoder interface {
+	Encode(v interface{}) ([]byte, error)
+}
 
 // FileInfo represents information about a file in the torrent
 type FileInfo struct {
@@ -173,4 +179,42 @@ func Parse(data []byte) (*TorrentFile, error) {
 	}
 
 	return torrent, nil
+}
+
+// InfoHash returns the SHA-1 hash of the bencoded info dictionary
+func (t *TorrentFile) InfoHash() ([20]byte, error) {
+	// We need to re-encode just the info dictionary
+	infoDict := map[string]interface{}{
+		"piece length": t.Info.PieceLength,
+		"pieces":       t.Info.Pieces,
+		"name":         t.Info.Name,
+	}
+
+	// Add conditional fields
+	if t.Info.Length > 0 {
+		infoDict["length"] = t.Info.Length
+	} else {
+		// For multi-file torrents
+		files := make([]interface{}, 0, len(t.Info.Files))
+		for _, file := range t.Info.Files {
+			fileDict := map[string]interface{}{
+				"length": file.Length,
+				"path":   file.Path,
+			}
+			files = append(files, fileDict)
+		}
+		infoDict["files"] = files
+	}
+	if t.Info.Private != 0 {
+		infoDict["private"] = t.Info.Private
+	}
+
+	// For now, we'll re-encode manually since we haven't implemented an encoder yet
+	encoded, err := bencode.EncodeDict(infoDict)
+	if err != nil {
+		return [20]byte{}, err
+	}
+
+	// Calculate SHA-1 hash
+	return sha1.Sum(encoded), nil
 }

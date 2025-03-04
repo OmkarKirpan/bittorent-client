@@ -29,4 +29,12 @@ func main() {
 			fmt.Printf("  File %d: %v (%d bytes)\n", i+1, file.Path, file.Length)
 		}
 	}
+
+	// Calculate and print the info hash
+	infoHash, err := torrentFile.InfoHash()
+	if err != nil {
+		log.Fatalf("Error calculating info hash: %v", err)
+	}
+
+	fmt.Printf("Info Hash: %x\n", infoHash)
 }

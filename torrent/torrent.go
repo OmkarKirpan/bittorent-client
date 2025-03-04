@@ -3,6 +3,7 @@ package torrent
 import (
 	"crypto/sha1"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -217,4 +218,60 @@ func (t *TorrentFile) InfoHash() ([20]byte, error) {
 
 	// Calculate SHA-1 hash
 	return sha1.Sum(encoded), nil
+}
+
+// PieceHash returns the hash for a specific piece
+func (t *TorrentFile) PieceHash(index int) ([20]byte, error) {
+	if len(t.Info.Pieces)%20 != 0 {
+		return [20]byte{}, errors.New("pieces length is not a multiple of 20")
+	}
+
+	numPieces := len(t.Info.Pieces) / 20
+	if index < 0 || index >= numPieces {
+		return [20]byte{}, fmt.Errorf("piece index out of range: %d (total: %d)", index, numPieces)
+	}
+
+	// Extract the 20-byte hash at the given index
+	var hash [20]byte
+	copy(hash[:], t.Info.Pieces[index*20:(index+1)*20])
+
+	return hash, nil
+}
+
+// NumPieces returns the total number of pieces
+func (t *TorrentFile) NumPieces() int {
+	return len(t.Info.Pieces) / 20
+}
+
+// PieceLength returns the length of a piece at the given index
+func (t *TorrentFile) PieceLength(index int) int64 {
+	if index < 0 || index >= t.NumPieces() {
+		return 0
+	}
+
+	// The last piece might be shorter
+	if index == t.NumPieces()-1 {
+		totalLength := t.TotalLength()
+		if totalLength%t.Info.PieceLength == 0 {
+			return t.Info.PieceLength
+		}
+		return totalLength % t.Info.PieceLength
+	}
+
+	return t.Info.PieceLength
+}
+
+// TotalLength returns the total size of all files in the torrent
+func (t *TorrentFile) TotalLength() int64 {
+	if t.Info.Length > 0 {
+		// Single file mode
+		return t.Info.Length
+	}
+
+	// Multiple files mode
+	var totalLength int64
+	for _, file := range t.Info.Files {
+		totalLength += file.Length
+	}
+	return totalLength
 }

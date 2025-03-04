@@ -7,6 +7,26 @@ import (
 	"github.com/omkarkirpan/bittorrent-client/torrent"
 )
 
+// humanReadableSize converts bytes to a human-readable format.
+func humanReadableSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+}
+
 func main() {
 	fmt.Println("BitTorrent Client")
 
@@ -37,4 +57,33 @@ func main() {
 	}
 
 	fmt.Printf("Info Hash: %x\n", infoHash)
+
+	// Print information about pieces
+	numPieces := torrentFile.NumPieces()
+	fmt.Printf("Number of Pieces: %d\n", numPieces)
+	fmt.Printf("Total Size: %s bytes\n", humanReadableSize(torrentFile.TotalLength()))
+
+	// Print first few piece hashes
+	displayCount := 3
+	if displayCount > numPieces {
+		displayCount = numPieces
+	}
+
+	for i := 0; i < displayCount; i++ {
+		hash, err := torrentFile.PieceHash(i)
+		if err != nil {
+			log.Fatalf("Error getting piece hash: %v", err)
+		}
+		fmt.Printf("Piece %d Hash: %x (Length: %s bytes)\n", i, hash, humanReadableSize(torrentFile.PieceLength(i)))
+	}
+
+	// Also print last piece if there are more than the display count
+	if numPieces > displayCount {
+		hash, err := torrentFile.PieceHash(numPieces - 1)
+		if err != nil {
+			log.Fatalf("Error getting piece hash: %v", err)
+		}
+		fmt.Printf("Last Piece (%d) Hash: %x (Length: %s bytes)\n",
+			numPieces-1, hash, humanReadableSize(torrentFile.PieceLength(numPieces-1)))
+	}
 }

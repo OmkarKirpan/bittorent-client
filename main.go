@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/omkarkirpan/bittorrent-client/peer"
 	"github.com/omkarkirpan/bittorrent-client/torrent"
 	"github.com/omkarkirpan/bittorrent-client/tracker"
 )
@@ -96,11 +98,86 @@ func main() {
 	}
 
 	fmt.Printf("Found %d peers:\n", len(peers))
-	for i, peer := range peers {
+	for i, p := range peers {
 		if i >= 5 {
 			fmt.Printf("... and %d more\n", len(peers)-5)
 			break
 		}
-		fmt.Printf("  %s\n", peer.String())
+		fmt.Printf("  %s\n", p.String())
+	}
+
+	// Generate a peer ID (this should match the one used in tracker request)
+	var peerId [20]byte
+	copy(peerId[:], []byte("-GO0001-1234567890123"))
+
+	// Test peer handshake with the first few peers
+	fmt.Println("\nAttempting handshakes with peers...")
+
+	maxPeersToTry := 5
+	if len(peers) < maxPeersToTry {
+		maxPeersToTry = len(peers)
+	}
+
+	handshakeSuccessful := false
+	var successfulPeer tracker.Peer
+	var successfulHandshake *peer.Handshake
+
+	// Try each peer until we get a successful handshake
+	for i := 0; i < maxPeersToTry && !handshakeSuccessful; i++ {
+		fmt.Printf("Trying peer %d: %s\n", i+1, peers[i].String())
+
+		// Set a timeout for the handshake
+		handshakeChan := make(chan struct {
+			handshake *peer.Handshake
+			err       error
+		})
+
+		go func(p tracker.Peer) {
+			handshake, conn, err := peer.PerformHandshake(p.String(), infoHash, peerId)
+			if err == nil && conn != nil {
+				defer conn.Close()
+			}
+			handshakeChan <- struct {
+				handshake *peer.Handshake
+				err       error
+			}{handshake, err}
+		}(peers[i])
+
+		// Wait for handshake or timeout
+		select {
+		case result := <-handshakeChan:
+			if result.err != nil {
+				fmt.Printf("  Handshake failed: %v\n", result.err)
+			} else {
+				fmt.Println("  Handshake successful!")
+				handshakeSuccessful = true
+				successfulPeer = peers[i]
+				successfulHandshake = result.handshake
+			}
+		case <-time.After(5 * time.Second):
+			fmt.Println("  Handshake timed out")
+		}
+	}
+
+	// If we found a successful peer, display information about it
+	if handshakeSuccessful {
+		fmt.Printf("\nSuccessfully connected to peer: %s\n", successfulPeer.String())
+		fmt.Printf("Remote peer ID: %x\n", successfulHandshake.PeerID)
+
+		// Check for extension support
+		if successfulHandshake.HasExtension(peer.ExtensionDHT) {
+			fmt.Println("Peer supports DHT")
+		}
+		if successfulHandshake.HasExtension(peer.ExtensionExtensions) {
+			fmt.Println("Peer supports Extension Protocol")
+		}
+		if successfulHandshake.HasExtension(peer.ExtensionFast) {
+			fmt.Println("Peer supports Fast Extension")
+		}
+	} else {
+		fmt.Println("\nFailed to handshake with any peers. This can happen if:")
+		fmt.Println("1. The peers are not online or are not accepting connections")
+		fmt.Println("2. Network restrictions are preventing the connections")
+		fmt.Println("3. The peers have reached their connection limit")
 	}
 }

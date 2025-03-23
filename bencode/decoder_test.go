@@ -111,24 +111,24 @@ func TestDecode(t *testing.T) {
 				err:      nil,
 			},
 			{
-				name:     "Valid complex dictionary",
-				input:    []byte("d3:foo3:bar5:helloi52e4:listli1ei2ei3eee"),
+				name:  "Valid complex dictionary",
+				input: []byte("d3:foo3:bar5:helloi52e4:listli1ei2ei3eee"),
 				expected: map[string]interface{}{
 					"foo":   "bar",
 					"hello": int64(52),
 					"list":  []interface{}{int64(1), int64(2), int64(3)},
 				},
-				bytes:    40,
-				err:      nil,
+				bytes: 40,
+				err:   nil,
 			},
 			{
-				name:     "Valid nested dictionary",
-				input:    []byte("d3:food3:baz3:quxee"),
+				name:  "Valid nested dictionary",
+				input: []byte("d3:food3:baz3:quxee"),
 				expected: map[string]interface{}{
 					"foo": map[string]interface{}{"baz": "qux"},
 				},
-				bytes:    19,
-				err:      nil,
+				bytes: 19,
+				err:   nil,
 			},
 			{
 				name:     "Empty dictionary",
@@ -142,7 +142,7 @@ func TestDecode(t *testing.T) {
 				input:    []byte("dxyz"),
 				expected: map[string]interface{}{},
 				bytes:    0,
-				err:      errors.New("error decoding dictionary key: unkown type: x"),
+				err:      errors.New("error decoding dictionary key: unknown type: x"),
 			},
 			{
 				name:     "Invalid dictionary (no end marker)",
@@ -163,7 +163,7 @@ func TestDecode(t *testing.T) {
 				input:    []byte("d3:fooe"),
 				expected: map[string]interface{}{},
 				bytes:    0,
-				err:      errors.New("error decoding dictionary value: unkown type: e"),
+				err:      errors.New("error decoding dictionary value: unknown type: e"),
 			},
 			{
 				name:     "Invalid dictionary (invalid value)",
@@ -196,7 +196,7 @@ func TestDecode(t *testing.T) {
 				input:    []byte("a:hello"),
 				expected: nil,
 				bytes:    0,
-				err:      fmt.Errorf("unkown type: %c", 'a'),
+				err:      fmt.Errorf("unknown type: %c", 'a'),
 			},
 		})
 	})
@@ -216,7 +216,7 @@ func runTests(t *testing.T, tests []testCase) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, n, err := Decode(tt.input)
-			
+
 			// Check error correctness
 			if err != nil && tt.err != nil {
 				if err.Error() != tt.err.Error() {
@@ -225,12 +225,12 @@ func runTests(t *testing.T, tests []testCase) {
 			} else if (err == nil) != (tt.err == nil) {
 				t.Errorf("Decode(%q) error = %v, want error = %v", tt.input, err, tt.err)
 			}
-			
+
 			// Check bytes read
 			if n != tt.bytes {
 				t.Errorf("Decode(%q) bytes = %d, want %d", tt.input, n, tt.bytes)
 			}
-			
+
 			// Check result, with special handling for empty lists and dictionaries
 			if listResult, ok := result.([]interface{}); ok {
 				if expectedList, ok2 := tt.expected.([]interface{}); ok2 {
